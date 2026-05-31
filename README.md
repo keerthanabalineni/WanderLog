@@ -1,6 +1,6 @@
 # WanderLog
 
-A React + Vite single-page app for exploring countries, authenticating with Reqres.in, and saving a travel bucket list.
+A React + Vite single-page app that uses Reqres.in for mock authentication and the REST Countries API for live country data.
 
 ## Run locally
 
@@ -23,18 +23,20 @@ npm run dev
 - Email: `eve.holt@reqres.in`
 - Password: any password
 
-## Optional API key support
+> If Reqres returns a missing API key error, the app falls back to a local demo login for the test user.
 
-Reqres now requires an `x-api-key` header for classic auth endpoints. If you want to use a real Reqres API key, create a `.env` file with:
+## Features implemented
 
-```env
-VITE_REQRES_API_KEY=your_reqres_api_key
-```
-
-Without a key, the app still supports a local demo fallback for the provided test email.
+- Authentication with sign in / sign up support
+- Protected routes for explore and country detail screens
+- Session persistence with localStorage
+- REST Countries API fetching with loading and error states
+- Country detail screen with neighbor links
+- Per-user bucket list and visited state
+- Responsive layout for desktop and mobile screens
 
 ## What I would improve with more time
 
-- Add a saved destinations sidebar so users can manage wish list and visited countries without leaving the explore screen.
-- Show country detail by name in the border list and cache country data to avoid repeated fetches.
-- Add a dark mode toggle persisted in localStorage.
+- Add a saved destinations sidebar for quick list management.
+- Cache fetched country details to reduce repeat network requests.
+- Add dark mode and more accessible keyboard focus styles.

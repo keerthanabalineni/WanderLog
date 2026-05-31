@@ -1,166 +1,155 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+﻿import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useApp } from "../context/AppContext";
 
-function formatNumber(value) {
-  return new Intl.NumberFormat().format(value)
-}
+function CountryDetail() {
+  const { code } = useParams();
+  const navigate = useNavigate();
+  const { bucket, updateCountryStatus } = useApp();
+  const [country, setCountry] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-function listValues(source) {
-  if (!source) {
-    return '—'
-  }
-  return Object.values(source).join(', ')
-}
-
-export default function CountryDetail({ bucket, onAdd, onUpdate, onRemove }) {
-  const { code } = useParams()
-  const navigate = useNavigate()
-  const [country, setCountry] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const status = bucket[code];
 
   useEffect(() => {
-    const fetchCountry = async () => {
-      setLoading(true)
-      setError('')
+    if (!code) return;
+
+    const controller = new AbortController();
+
+    async function loadCountry() {
+      setLoading(true);
+      setError("");
 
       try {
         const response = await fetch(
-          `https://restcountries.com/v3.1/alpha/${code}?fields=name,cca3,flags,region,subregion,capital,population,area,languages,currencies,borders`
-        )
-        const data = await response.json()
+          `https://restcountries.com/v3.1/alpha/${code}?fields=name,cca3,flags,region,subregion,capital,population,area,languages,currencies,borders`,
+          { signal: controller.signal }
+        );
 
         if (!response.ok) {
-          throw new Error(data.message || 'Unable to load country details.')
+          throw new Error("Unable to load country details.");
         }
 
-        setCountry(Array.isArray(data) ? data[0] : data)
+        const data = await response.json();
+        setCountry(Array.isArray(data) ? data[0] : data);
       } catch (fetchError) {
-        setError(fetchError.message || 'Unable to load country details.')
+        if (fetchError.name !== "AbortError") {
+          setError(fetchError.message || "Country details failed to load.");
+        }
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
-    fetchCountry()
-  }, [code])
+    loadCountry();
+    return () => controller.abort();
+  }, [code]);
 
-  const current = bucket[code]
-  const status = current?.status
-  const actionLabel = !status ? 'Add to wish list' : status === 'wish' ? 'Mark visited' : 'Move to wish list'
+  const handlePrimary = () => {
+    if (!code) return;
+    updateCountryStatus(code, status === "visited" ? "wish" : "visited");
+  };
 
-  const handleAction = () => {
-    if (!country) {
-      return
-    }
+  const handleSecondary = () => {
+    if (!code) return;
+    updateCountryStatus(code, status ? null : "wish");
+  };
 
-    if (!status) {
-      onAdd(code, {
-        name: country.name.common,
-        region: country.region
-      })
-      return
-    }
-
-    if (status === 'wish') {
-      onUpdate(code, 'visited')
-      return
-    }
-
-    onUpdate(code, 'wish')
-  }
+  const languageText = country?.languages ? Object.values(country.languages).join(", ") : "—";
+  const currencyText = country?.currencies
+    ? Object.values(country.currencies).map((item) => item.name).join(", ")
+    : "—";
 
   return (
-    <main className="page detail-page">
-      <div className="detail-header">
-        <div>
-          <button className="button tertiary" type="button" onClick={() => navigate(-1)}>
-            ← Back
+    <main className="page-wrapper">
+      <div className="detail-card">
+        <div className="detail-header">
+          <button className="back-button" type="button" onClick={() => navigate("/explore", { replace: true })}>
+            ← Back to explore
           </button>
+          <span className={`status-pill ${status || ""}`}>{status ? status : "Not saved"}</span>
         </div>
-        <div className="detail-actions">
-          <Link to="/" className="button secondary">
-            Explore countries
-          </Link>
-        </div>
-      </div>
 
-      {error ? (
-        <div className="error-box detail-error">{error}</div>
-      ) : loading ? (
-        <div className="loader-panel">
-          <div className="loader" />
-          <p>Loading country details…</p>
-        </div>
-      ) : country ? (
-        <section className="detail-grid">
-          <div className="detail-map">
+        {loading ? (
+          <p className="status-text">Loading country details…</p>
+        ) : error ? (
+          <p className="status-text error">{error}</p>
+        ) : country ? (
+          <>
             <img
-              src={country.flags.svg}
-              alt={`Flag of ${country.name.common}`}
               className="detail-flag"
+              src={country.flags.svg || country.flags.png}
+              alt={country.name.common}
             />
-          </div>
 
-          <div className="detail-card">
-            <div className="detail-title-row">
-              <div>
-                <p className="eyebrow">Country detail</p>
-                <h1>{country.name.common}</h1>
-                <p className="detail-subtitle">{country.region} • {country.subregion}</p>
-              </div>
-              {status && <span className={`status-pill ${status === 'visited' ? 'visited' : ''}`}>{status}</span>}
+            <div className="detail-title">
+              <h1>{country.name.common}</h1>
+              <p>📍 {country.capital?.[0] ?? "—"}</p>
             </div>
 
-            <div className="detail-meta">
-              <div className="meta-item">
-                <span>Capital</span>
-                <strong>{country.capital?.[0] || '—'}</strong>
+            <div className="stats-grid">
+              <div className="stat-block">
+                <span>Region</span>
+                <strong>{country.region ?? "—"}</strong>
               </div>
-              <div className="meta-item">
+              <div className="stat-block">
+                <span>Subregion</span>
+                <strong>{country.subregion ?? "—"}</strong>
+              </div>
+              <div className="stat-block">
                 <span>Population</span>
-                <strong>{formatNumber(country.population)}</strong>
+                <strong>{country.population?.toLocaleString() ?? "—"}</strong>
               </div>
-              <div className="meta-item">
+              <div className="stat-block">
                 <span>Area</span>
-                <strong>{formatNumber(country.area)} km²</strong>
-              </div>
-              <div className="meta-item">
-                <span>Languages</span>
-                <strong>{listValues(country.languages)}</strong>
-              </div>
-              <div className="meta-item">
-                <span>Currencies</span>
-                <strong>{listValues(country.currencies)}</strong>
+                <strong>{country.area?.toLocaleString() ?? "—"} km²</strong>
               </div>
             </div>
 
-            <div className="detail-buttons">
-              <button className="button primary" type="button" onClick={handleAction}>
-                {actionLabel}
-              </button>
-              {status && (
-                <button className="button tertiary" type="button" onClick={() => onRemove(code)}>
-                  Remove from bucket list
-                </button>
-              )}
+            <div className="stats-grid">
+              <div className="stat-block">
+                <span>Language</span>
+                <strong>{languageText}</strong>
+              </div>
+              <div className="stat-block">
+                <span>Currency</span>
+                <strong>{currencyText}</strong>
+              </div>
+              <div className="stat-block">
+                <span>Capital</span>
+                <strong>{country.capital?.[0] ?? "—"}</strong>
+              </div>
             </div>
 
-            {Array.isArray(country.borders) && country.borders.length > 0 && (
-              <div className="border-list-panel">
-                <p className="field-label">Bordering countries</p>
-                <div className="border-list">
-                  {country.borders.map((borderCode) => (
-                    <Link key={borderCode} to={`/country/${borderCode}`} className="border-pill">
-                      {borderCode}
+            <section className="neighbors">
+              <h2>Neighboring countries</h2>
+              <div className="neighbors-list">
+                {country.borders?.length ? (
+                  country.borders.map((border) => (
+                    <Link key={border} className="neighbor-pill" to={`/country/${border}`}>
+                      {border}
                     </Link>
-                  ))}
-                </div>
+                  ))
+                ) : (
+                  <span>No neighbors available</span>
+                )}
               </div>
-            )}
-          </div>
-        </section>
-      ) : null}
+            </section>
+
+            <div className="detail-actions">
+              <button className="primary-btn" type="button" onClick={handlePrimary}>
+                {status === "visited" ? "Move to bucket list" : "Mark visited"}
+              </button>
+              <button className="secondary-btn" type="button" onClick={handleSecondary}>
+                {status ? "Remove from list" : "Add to bucket list"}
+              </button>
+            </div>
+          </>
+        ) : null}
+      </div>
     </main>
-  )
+  );
 }
+
+export default CountryDetail;

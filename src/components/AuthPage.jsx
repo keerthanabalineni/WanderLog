@@ -1,98 +1,101 @@
-import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+﻿import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useApp } from "../context/AppContext";
 
-export default function AuthPage({ onAuth }) {
-  const [mode, setMode] = useState('login')
-  const [email, setEmail] = useState('eve.holt@reqres.in')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+function AuthPage() {
+  const { user, login } = useApp();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("eve.holt@reqres.in");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState("login");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
-  const navigate = useNavigate()
-  const location = useLocation()
-  const from = location.state?.from?.pathname || '/'
+  useEffect(() => {
+    if (user) {
+      navigate("/explore", { replace: true });
+    }
+  }, [user, navigate]);
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setError('')
-    setLoading(true)
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    setInfo("");
 
-    const result = await onAuth(email.trim(), password, mode === 'register')
-    setLoading(false)
+    const result = await login({ email, password, register: mode === "signup" });
 
     if (result.success) {
-      navigate(from, { replace: true })
-    } else {
-      setError(result.message)
+      navigate("/explore", { replace: true });
+      return;
     }
+
+    setError(result.message);
+    setLoading(false);
   }
 
   return (
-    <main className="page auth-page">
-      <div className="auth-panel">
-        <div className="auth-brand">
-          <div>
-            <p className="eyebrow">WanderLog</p>
-            <h1>Your travel bucket list</h1>
-          </div>
-          <p className="subtext">Sign in or create a mock account with Reqres.in to start exploring countries and saving destinations.</p>
-        </div>
+    <main className="auth-layout">
+      <div className="auth-card">
+        <div className="logo">🌍</div>
 
-        <div className="auth-tabs">
-          <button
-            type="button"
-            className={`tab ${mode === 'login' ? 'active' : ''}`}
-            onClick={() => setMode('login')}
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            className={`tab ${mode === 'register' ? 'active' : ''}`}
-            onClick={() => setMode('register')}
-          >
-            Sign up
-          </button>
-        </div>
+        <h1>WanderLog</h1>
+        <p className="auth-subtitle">Sign in or sign up to explore the world.</p>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <div className="form-field">
-            <label htmlFor="email">Email</label>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <label>
+            Email
             <input
-              id="email"
+              autoComplete="username"
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="eve.holt@reqres.in"
-              autoComplete="username"
-              className="form-control"
+              required
             />
-          </div>
+          </label>
 
-          <div className="form-field">
-            <label htmlFor="password">Password</label>
+          <label>
+            Password
             <input
-              id="password"
+              autoComplete="current-password"
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Your password"
-              autoComplete="current-password"
-              className="form-control"
+              placeholder="Enter your password"
+              required
             />
-          </div>
+          </label>
 
-          {error && <div className="error-box">{error}</div>}
+          {error && <p className="status-text error">{error}</p>}
+          {info && <p className="status-text">{info}</p>}
 
-          <button className="button primary" type="submit" disabled={loading}>
-            {loading ? 'Working…' : mode === 'login' ? 'Login' : 'Create account'}
+          <button className="primary-btn" type="submit" disabled={loading}>
+            {loading ? "Working…" : mode === "login" ? "Sign in" : "Create account"}
           </button>
-
-          <p className="helper-text">
-            Use <strong>eve.holt@reqres.in</strong> and any password. If no Reqres API key is configured, the app will fall back to a demo auth flow for this email.
-          </p>
         </form>
+
+        <div className="auth-footer">
+          <p className="tiny-text">
+            Use <strong>eve.holt@reqres.in</strong> and any password for a successful mock login.
+          </p>
+
+          <button
+            type="button"
+            className="secondary-link"
+            onClick={() => {
+              setMode(mode === "login" ? "signup" : "login");
+              setError("");
+              setInfo("");
+            }}
+          >
+            {mode === "login" ? "Need an account? Sign up" : "Already have an account? Sign in"}
+          </button>
+        </div>
       </div>
     </main>
-  )
+  );
 }
+
+export default AuthPage;

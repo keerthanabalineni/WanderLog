@@ -1,192 +1,145 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+﻿import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useApp } from "../context/AppContext";
 
-function formatNumber(value) {
-  return new Intl.NumberFormat().format(value)
-}
-
-export default function ExplorePage({ bucket, wishCount, visitedCount, onLogout }) {
-  const [countries, setCountries] = useState([])
-  const [search, setSearch] = useState('')
-  const [region, setRegion] = useState('All')
-  const [sortKey, setSortKey] = useState('name')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+function ExplorePage() {
+  const { user, logout, bucket, counts } = useApp();
+  const [countries, setCountries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [regionFilter, setRegionFilter] = useState("All");
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchCountries = async () => {
-      setLoading(true)
-      setError('')
+    const controller = new AbortController();
+
+    async function loadCountries() {
+      setLoading(true);
+      setError("");
 
       try {
         const response = await fetch(
-          'https://restcountries.com/v3.1/all?fields=name,cca3,flags,region,capital,population,area'
-        )
-        const data = await response.json()
+          "https://restcountries.com/v3.1/all?fields=name,cca3,flags,region,capital,population,area,subregion,languages,borders",
+          { signal: controller.signal }
+        );
 
         if (!response.ok) {
-          throw new Error(data.message || 'Unable to load country data.')
+          throw new Error("Unable to load countries.");
         }
 
-        const sorted = data.sort((a, b) => a.name.common.localeCompare(b.name.common))
-        setCountries(sorted)
+        const data = await response.json();
+        setCountries(Array.isArray(data) ? data.sort((a, b) => a.name.common.localeCompare(b.name.common)) : []);
       } catch (fetchError) {
-        setError(fetchError.message || 'Country list failed to load.')
+        if (fetchError.name !== "AbortError") {
+          setError(fetchError.message || "Country list failed to load.");
+        }
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
 
-    fetchCountries()
-  }, [])
+    loadCountries();
+    return () => controller.abort();
+  }, []);
 
   const regions = useMemo(() => {
-    const unique = new Set(countries.map((country) => country.region).filter(Boolean))
-    return ['All', ...Array.from(unique).sort()]
-  }, [countries])
+    return [
+      "All",
+      ...Array.from(new Set(countries.map((country) => country.region).filter(Boolean))).sort(),
+    ];
+  }, [countries]);
 
   const filteredCountries = useMemo(() => {
-    return countries
-      .filter((country) => {
-        const searchText = `${country.name.common} ${country.capital?.[0] ?? ''}`.toLowerCase()
-        return searchText.includes(search.toLowerCase())
-      })
-      .filter((country) => region === 'All' || country.region === region)
-      .sort((a, b) => {
-        if (sortKey === 'population') {
-          return a.population - b.population
-        }
-        if (sortKey === 'area') {
-          return a.area - b.area
-        }
-        return a.name.common.localeCompare(b.name.common)
-      })
-  }, [countries, search, region, sortKey])
-
-  const totalCountries = countries.length
-  const selectedCount = filteredCountries.length
+    return countries.filter((country) => {
+      const text = `${country.name.common} ${country.capital?.[0] ?? ""}`.toLowerCase();
+      const searchMatch = text.includes(search.toLowerCase());
+      const regionMatch = regionFilter === "All" || country.region === regionFilter;
+      return searchMatch && regionMatch;
+    });
+  }, [countries, search, regionFilter]);
 
   return (
-    <main className="page explore-page">
-      <header className="page-header">
+    <main className="page-wrapper">
+      <header className="topbar">
         <div>
-          <p className="eyebrow">Explore</p>
-          <h1>Discover countries worth adding to your bucket list</h1>
-          <p className="lead">
-            Search, filter, and save destinations you want to visit. Your travel preferences persist across refreshes.
-          </p>
+          <p className="eyebrow">Welcome back</p>
+          <h1>Explore the world</h1>
+          <p className="subtext">Signed in as <strong>{user.email}</strong></p>
         </div>
-        <div className="top-actions">
-          <div className="pill-row">
-            <span className="pill">Wish list: {wishCount}</span>
-            <span className="pill visited">Visited: {visitedCount}</span>
-          </div>
-          <button className="button secondary" type="button" onClick={onLogout}>
-            Logout
+
+        <div className="topbar-actions">
+          <button className="secondary-btn logout-btn" onClick={() => { logout(); navigate("/login", { replace: true }); }}>
+            Sign out
           </button>
         </div>
       </header>
 
-      <section className="search-panel">
-        <div className="controls">
-          <label className="field-group">
-            <span>Search</span>
-            <input
-              className="form-control"
-              placeholder="Search by country or capital"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
+      <div className="meta-row">
+        <div className="metric-card">
+          <span className="metric-label">Bucket list</span>
+          <strong>{counts.wish}</strong>
+        </div>
+        <div className="metric-card">
+          <span className="metric-label">Visited</span>
+          <strong>{counts.visited}</strong>
+        </div>
+        <div className="metric-card">
+          <span className="metric-label">Showing</span>
+          <strong>{filteredCountries.length}</strong>
+        </div>
+      </div>
 
-          <label className="field-group">
-            <span>Region</span>
-            <select className="form-control" value={region} onChange={(event) => setRegion(event.target.value)}>
-              {regions.map((regionOption) => (
-                <option key={regionOption} value={regionOption}>
-                  {regionOption}
-                </option>
-              ))}
-            </select>
-          </label>
+      <div className="toolbar">
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search by country or capital"
+        />
 
-          <label className="field-group">
-            <span>Sort by</span>
-            <select className="form-control" value={sortKey} onChange={(event) => setSortKey(event.target.value)}>
-              <option value="name">Name</option>
-              <option value="population">Population</option>
-              <option value="area">Area</option>
-            </select>
-          </label>
+        <div className="filters">
+          {regions.map((region) => (
+            <button
+              key={region}
+              type="button"
+              className={regionFilter === region ? "active" : ""}
+              onClick={() => setRegionFilter(region)}
+            >
+              {region}
+            </button>
+          ))}
         </div>
-      </section>
+      </div>
 
-      <section className="summary-panel">
-        <div className="summary-item">
-          <strong>{totalCountries}</strong>
-          <span>countries loaded</span>
-        </div>
-        <div className="summary-item">
-          <strong>{selectedCount}</strong>
-          <span>results shown</span>
-        </div>
-        <div className="summary-item">
-          <strong>{wishCount + visitedCount}</strong>
-          <span>saved destinations</span>
-        </div>
-      </section>
-
-      {error ? (
-        <div className="error-box">
-          <p>Unable to load countries.</p>
-          <p>{error}</p>
-          <button className="button tertiary" type="button" onClick={() => window.location.reload()}>
-            Retry
-          </button>
-        </div>
-      ) : loading ? (
-        <div className="loader-panel">
-          <div className="loader" />
-          <p>Loading countries…</p>
-        </div>
+      {loading ? (
+        <p className="status-text">Loading countries…</p>
+      ) : error ? (
+        <p className="status-text error">{error}</p>
       ) : (
-        <section className="grid-panel">
+        <div className="country-grid">
           {filteredCountries.map((country) => {
-            const saved = bucket[country.cca3]
+            const status = bucket[country.cca3];
             return (
-              <article key={country.cca3} className="country-card">
-                <img src={country.flags.svg} alt={`Flag of ${country.name.common}`} className="country-flag" />
-                <div className="country-card-body">
-                  <div className="card-header">
-                    <div>
-                      <h2>{country.name.common}</h2>
-                      <p>{country.region}</p>
-                    </div>
-                    {saved && <span className={`status-pill ${saved.status === 'visited' ? 'visited' : ''}`}>{saved.status}</span>}
+              <Link className="country-card" key={country.cca3} to={`/country/${country.cca3}`}>
+                <img src={country.flags.svg || country.flags.png} alt={country.name.common} />
+
+                <div className="card-body">
+                  <div className="card-title-row">
+                    <h3>{country.name.common}</h3>
+                    {status && <span className={`status-pill ${status}`}>{status}</span>}
                   </div>
 
-                  <div className="country-meta">
-                    <span>Population</span>
-                    <strong>{formatNumber(country.population)}</strong>
-                  </div>
-                  <div className="country-meta">
-                    <span>Area</span>
-                    <strong>{formatNumber(country.area)} km²</strong>
-                  </div>
-                  <div className="country-meta">
-                    <span>Capital</span>
-                    <strong>{country.capital?.[0] || '—'}</strong>
-                  </div>
-
-                  <Link to={`/country/${country.cca3}`} className="button primary block-link">
-                    View details
-                  </Link>
+                  <p className="country-meta">
+                    {country.capital?.[0] ?? "No capital"} · {country.region}
+                  </p>
                 </div>
-              </article>
-            )
+              </Link>
+            );
           })}
-        </section>
+        </div>
       )}
     </main>
-  )
+  );
 }
+
+export default ExplorePage;
